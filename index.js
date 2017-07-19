@@ -280,7 +280,28 @@ function start() {
             }, 10000); // delay
         } else {
             match = res;
-            selectStyle();
+            if ( config.base_url.endsWith(".xml") ) {
+                base_url = base_url.replace("/sitemap_products_1.xml", '');
+                request({
+                    url: `${base_url}/products/${match.handle}.json`,
+                    followAllRedirects: true,
+                    method: 'get',
+                    headers: {
+                        'User-Agent': userAgent
+                    }
+                }, function(err, res, body) {
+                    if (err) {
+                        log('An error occured...', 'error');
+                        process.exit(1);
+                    } else {
+                        var products = JSON.parse(body);
+                        match = products.product;
+                        selectStyle();
+                    }
+                });
+            } else {
+                selectStyle();
+            }
         }
     });
 }
@@ -294,6 +315,7 @@ function findItem(kw, proxy, cb) {
 
         request({
             url: config.base_url,
+            followAllRedirects: true,
             method: 'get',
             headers: {
                 'User-Agent': userAgent
@@ -303,20 +325,55 @@ function findItem(kw, proxy, cb) {
 
             parseString(body, function(err, result) {
                 if (err) {
-                    log('An error occured while trying to parse the sitemap provided', 'error');
-                    process.exit(1);
-                }
-                log('result.length ' + result.length)
-                if (dev) {
-                    fs.writeFile('debug.html', result, function(err) {
-                        log('The file debug.html was saved the root of the project file.');
-                    });
+                    log('An error occured trying to parse the sitemap', 'error');
+                    start();
+                    //process.exit(1);
+                } else {
+
+                    var products = result.urlset.url;
+
+                    var foundItems = [];
+
+                    for ( var i = 2108; i < products.length; i++ ) {
+                        let locTag = products[i].loc[0];
+                        let imageTitle = products[i]["image:image"][0]["image:title"][0];
+                        if ( imageTitle.toLowerCase().indexOf(kw.toLowerCase()) > -1 ) {
+                            foundItems.push({title: imageTitle, handle: locTag.replace('https://kith.com/products/', '')});
+                        }
+                    }
+
+                    if (foundItems.length > 0) {
+                        if (foundItems.length === 1) {
+                            log(`Item Found! - "${foundItems[0].title}"`);
+                            match = foundItems[0];
+                            return cb(null, foundItems[0]);
+                        } else {
+
+                            log(`We found more than 1 item matching with the keyword(s) please select the item.\n`, 'warning');
+
+                            for (var i = 0; i < foundItems.length; i++) {
+                                log(`Product Choice #${i + 1}: "${foundItems[i].title}"`);
+                            }
+
+                            prompt.get([{
+                                name: 'productSelect',
+                                required: true,
+                                description: 'Select a Product # (ex: "2")'
+                            }], function(err, result) {
+                                var choice = parseInt(result.productSelect);
+                                match = foundItems[choice - 1];
+                                log(`You selected - "${match.title}`);
+                                return cb(null, match);
+                            });
+
+                        }
+                    } else {
+                        return cb('Match not found yet...', null);
+                    }
                 }
             });
         });
-
     } else {
-        log('non xml shit')
         request({
             url: `${base_url}/products.json`,
             method: 'get',
