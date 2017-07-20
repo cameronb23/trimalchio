@@ -333,12 +333,13 @@ function findItem(kw, proxy, cb) {
                     var products = result.urlset.url;
 
                     var foundItems = [];
-
-                    for ( var i = 2108; i < products.length; i++ ) {
+                    let base = base_url.replace(/https:\/\//, '').replace(/.com\/sitemap_products_1.xml/, '');
+                    for ( var i = 0; i < products.length; i++ ) {
+                        while ( products[i]["image:image"] == undefined ) { i++ }
                         let locTag = products[i].loc[0];
                         let imageTitle = products[i]["image:image"][0]["image:title"][0];
                         if ( imageTitle.toLowerCase().indexOf(kw.toLowerCase()) > -1 ) {
-                            foundItems.push({title: imageTitle, handle: locTag.replace('https://kith.com/products/', '')});
+                            foundItems.push({title: imageTitle, handle: locTag.replace('https://' + base + '.com/products/', '')});
                         }
                     }
 
